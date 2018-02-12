@@ -1,3 +1,11 @@
+# NOTE! Versioning
+
+This project releases a new version from master using MAJOR.BUILDCOUNT.0 as versioning scheme automatically. If you do breaking changes, 
+you should bump major version in package.json manually!
+
+Example: if package.json contains "1.0.0", and build count is 123, the published npm version will result in 1.123.0.
+if package.json contains "2.0.0", and build count is 127, the published npm version will result in 2.127.0.
+
 # SqsPoller
 
 ## constructor
@@ -13,7 +21,7 @@ default receive arguments are:
 ```javascript
 {
     MaxNumberOfMessages: 10,
-    WaitTimeSeconds: 20,
+    WaitTimeSeconds: 20
 }
 ```
 
@@ -28,7 +36,7 @@ Returns immediately. Starts polling the queue for messages.
 ## stop() -> Promise
 
 Returns promise. Resolves when poller has been stopped successfully 
-(i.e, stopped processing messages)
+(i.e, stopped processing messages). This immediately aborts any current long-polling to exit as soon as possible.
 
 ## Events
 It will emit the following events:
