@@ -3,5 +3,6 @@
 --recursive
 --slow 200
 --reporter spec
---require babel-register
+--require ts-node/register
 --require @springworks/test-harness
+test/**/*.ts
