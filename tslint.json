@@ -1,0 +1,6 @@
+{
+  "extends": "@springworks/tslint-config",
+  "rules": {
+    "member-access": true
+  }
+}

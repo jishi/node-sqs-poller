@@ -1,8 +1,9 @@
-import AWS from 'aws-sdk';
+import * as AWS from 'aws-sdk';
+import * as sinon from 'sinon';
 import autoRestoredSandbox from '@springworks/test-harness/autorestored-sandbox';
-import { default as SqsPoller } from '../../src/sqs-poller';
+import { SqsPoller } from '../../src/sqs-poller';
 import * as backoff from '../../src/backoff';
-import upsert_queue_if_not_exists from './queue-util';
+import { upsertQueueIfNotExists } from './queue-util';
 
 process.on('unhandledRejection', err => {
   throw err;
@@ -15,7 +16,7 @@ describe('test/acceptance/sqs-poller-backoff-test.js', () => {
   let queue_url;
 
   before('upsert a queue if it doesn\'t exist', () => {
-    return upsert_queue_if_not_exists(queue_name, 0)
+    return upsertQueueIfNotExists(queue_name, 0)
         .then(url => {
           queue_url = url;
           return null;

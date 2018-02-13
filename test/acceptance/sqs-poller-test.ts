@@ -1,7 +1,10 @@
-import AWS from 'aws-sdk';
 import autoRestoredSandbox from '@springworks/test-harness/autorestored-sandbox';
-import { default as SqsPoller, HandlerError, PollerError } from '../../src/sqs-poller';
-import upsert_queue_if_not_exists from './queue-util';
+import * as AWS from 'aws-sdk';
+import { expect } from 'chai';
+import { SinonSpy } from "sinon";
+import * as sinon from 'sinon';
+import { HandlerError, PollerError, SqsPoller } from '../../src/sqs-poller';
+import { upsertQueueIfNotExists } from './queue-util';
 
 process.on('unhandledRejection', err => {
   throw err;
@@ -14,7 +17,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
   let queue_url;
 
   before('upsert a queue if it doesn\'t exist', () => {
-    return upsert_queue_if_not_exists(queue_name, 60)
+    return upsertQueueIfNotExists(queue_name, 60)
         .then(url => {
           queue_url = url;
           return null;
@@ -305,7 +308,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
     it('should throw PollerError if started twice', done => {
       const timeout = setTimeout(() => {
         done(new Error('Didn\'t emit error when calling start twice, probably implemented wrong'));
-      }, 5);
+      }, 50);
 
       poller.on('error', err => {
         err.should.be.instanceOf(PollerError);
@@ -351,7 +354,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
         return poller.stop();
       });
 
-      it('should continuously call receiveMessage()', function(done) {
+      it('should continuously call receiveMessage()', function (done) {
         this.timeout(3000);
         setTimeout(() => {
           poller.sqs.receiveMessage.callCount.should.be.greaterThan(1);
@@ -382,7 +385,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
         return poller.stop();
       });
 
-      it('should continuously call receiveMessage()', function(done) {
+      it('should continuously call receiveMessage()', function (done) {
         this.timeout(5000);
         setTimeout(() => {
           poller.sqs.receiveMessage.callCount.should.be.greaterThan(2);
@@ -415,20 +418,21 @@ describe('test/acceptance/sqs-poller-test.js', () => {
     });
 
     describe('when started', () => {
+      let abort_spy : SinonSpy;
 
       beforeEach(() => {
         return poller.start();
       });
 
       beforeEach(() => {
-        sinon_sandbox.spy(poller.current_request, 'abort');
+        abort_spy = sinon_sandbox.spy(poller.current_request, 'abort');
       });
 
-      it('should call abort() when stopping a started poller', () => {
-        return poller.stop()
-            .then(() => {
-              poller.current_request.abort.should.be.called();
-            });
+      it('should call abort() when stopping a started poller', async () => {
+        expect(abort_spy.callCount).to.equal(0);
+        await poller.stop();
+        expect(abort_spy.callCount).to.equal(1);
+        expect(poller.current_request).to.equal(null);
       });
 
     });
