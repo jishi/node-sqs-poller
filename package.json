@@ -14,16 +14,21 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Springworks/node-sqs-poller.git"
+    "url": "https://github.com/Springworks/node-sqs-poller.git"
   },
   "author": "",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/Springworks/node-sqs-poller/issues"
-  },
-  "homepage": "https://github.com/Springworks/node-sqs-poller#readme",
   "engines": {
     "node": ">=8.9"
+  },
+  "nyc": {
+    "extension": [
+      ".ts"
+    ],
+    "reporter": [
+      "text-summary",
+      "html"
+    ]
   },
   "devDependencies": {
     "@springworks/test-harness": "^1.5.2",
