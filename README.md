@@ -66,3 +66,8 @@ Emits every time an error occurs during polling, processing or deletion
 of messages. If no error handler has been registered, it will throw a 
 global exception and cause a crash of the application. It is recommended 
 to map this to a logger.
+
+### aborted
+
+Emits every time an AbortedRequestException gets thrown from the underlying SQS instance from the AWS-SDK. Mostly for debugging purposes.
+

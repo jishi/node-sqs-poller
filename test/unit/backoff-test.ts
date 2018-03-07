@@ -1,6 +1,6 @@
-import { backoff } from '../../../src/backoff';
+import { backoff } from '../../src/backoff';
 
-describe('test/unit/subscribers/backoff-test.js', () => {
+describe('test/unit/backoff-test.js', () => {
   const multipliers = [1, 2, 3, 3];
 
   describe('with values that cannot exceed max backoff', () => {

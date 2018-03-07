@@ -1,7 +1,7 @@
 import autoRestoredSandbox from '@springworks/test-harness/autorestored-sandbox';
 import * as AWS from 'aws-sdk';
 import { expect } from 'chai';
-import { SinonSpy } from "sinon";
+import { SinonSpy } from 'sinon';
 import * as sinon from 'sinon';
 import { HandlerError, PollerError, SqsPoller } from '../../src/sqs-poller';
 import { upsertQueueIfNotExists } from './queue-util';
