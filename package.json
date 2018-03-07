@@ -34,6 +34,7 @@
     "@springworks/test-harness": "^1.5.2",
     "@springworks/tslint-config": "^1.1.1",
     "@types/chai": "^4.1.2",
+    "@types/lodash": "^4.14.104",
     "@types/mocha": "^2.2.48",
     "@types/node": "^9.4.5",
     "@types/sinon": "^4.1.3",

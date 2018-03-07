@@ -88,6 +88,14 @@ export class SqsPoller extends EventEmitter {
     this.current_request = null;
   }
 
+  public async simulate(msg) {
+    if (!this.running) {
+      throw new PollerError('Poller wasn\'t started, so no handler would have been invoked');
+    }
+
+    await this.handler(JSON.parse(JSON.stringify(msg)));
+  }
+
   private _throw(err: Error): void {
     setImmediate(() => {
       if (this.listenerCount('error') === 0) {
@@ -124,8 +132,6 @@ export class SqsPoller extends EventEmitter {
     }
     catch (err) {
       this._throw(err);
-      // TODO: should this really rethrow?
-      throw err;
     }
   }
 
@@ -155,13 +161,8 @@ export class SqsPoller extends EventEmitter {
       return true;
     }
     catch (err) {
-      try {
-        await this._setVisibility(receipt_id, parseInt(receive_count));
-        this._throw(err);
-      }
-      catch (err) {
-        this._throw(err);
-      }
+      this._throw(err);
+      await this._setVisibility(receipt_id, parseInt(receive_count));
       return false;
     }
   }
