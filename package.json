@@ -46,7 +46,6 @@
     "typescript": "^2.7.1"
   },
   "dependencies": {
-    "@springworks/input-validator": "^5.0.1",
     "aws-sdk": "^2.7.17",
     "lodash": "^4.17.4"
   }
