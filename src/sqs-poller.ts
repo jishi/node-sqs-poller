@@ -18,9 +18,14 @@ function delay(ms: number): Promise<void> {
 
 
 export class HandlerError extends Error {
-  constructor(msg: string) {
+  public sqs_payload : object | undefined;
+  public cause : Error | undefined;
+
+  constructor(msg: string, cause?: Error, sqs_payload? : object) {
     super(msg);
     this.name = 'HandlerError';
+    this.sqs_payload = sqs_payload;
+    this.cause = cause;
   }
 }
 
@@ -161,7 +166,9 @@ export class SqsPoller extends EventEmitter {
       return true;
     }
     catch (err) {
-      this._throw(err);
+      const wrapped_error = new HandlerError(err.message, err, body);
+      wrapped_error.stack = err.stack;
+      this._throw(wrapped_error);
       await this._setVisibility(receipt_id, parseInt(receive_count));
       return false;
     }

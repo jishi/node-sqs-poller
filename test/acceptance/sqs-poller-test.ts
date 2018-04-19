@@ -109,9 +109,11 @@ describe('test/acceptance/sqs-poller-test.js', () => {
 
     describe('when handler rejects', () => {
       let error_handler;
+      let error;
 
       beforeEach(() => {
-        handler.rejects(new Error('mocked reject error'));
+        error = new Error('mocked reject error');
+        handler.rejects(error);
       });
 
       beforeEach(() => {
@@ -167,9 +169,15 @@ describe('test/acceptance/sqs-poller-test.js', () => {
           poller.sqs.deleteMessage.callCount.should.equal(0);
         });
 
-        it('should invoke error handler with mocked error', () => {
+        it('should invoke error handler with wrapped HandlerError', () => {
           error_handler.should.be.calledOnce();
+          error_handler.firstCall.args[0].should.be.instanceOf(HandlerError);
           error_handler.firstCall.args[0].message.should.equal('mocked reject error');
+        });
+
+        it('should decorate error with actual payload and original error', () => {
+          error_handler.firstCall.args[0].sqs_payload.should.eql(message);
+          error_handler.firstCall.args[0].cause.should.equal(error);
         });
       });
 
