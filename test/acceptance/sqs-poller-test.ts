@@ -176,7 +176,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
         });
 
         it('should decorate error with actual payload and original error', () => {
-          error_handler.firstCall.args[0].sqs_payload.should.eql(message);
+          error_handler.firstCall.args[0].payload.should.eql(message);
           error_handler.firstCall.args[0].cause.should.equal(error);
         });
       });

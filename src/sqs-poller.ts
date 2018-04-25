@@ -5,8 +5,8 @@ import { backoff } from './backoff';
 
 export type MessageHandler = (message: any) => Promise<void>;
 
-const BACKOFF_MULTIPLIERS = [1, 1, 1, 2, 2, 2, 2, 2, 2];
-const MAX_BACKOFF_SECONDS = 3600;
+const BACKOFF_MULTIPLIERS = [1, 1, 1, 2, 2, 2, 2];
+const MAX_BACKOFF_SECONDS = 1200;
 const HTTP_TIMEOUT = 25000;
 
 
@@ -18,13 +18,13 @@ function delay(ms: number): Promise<void> {
 
 
 export class HandlerError extends Error {
-  public sqs_payload : object | undefined;
+  public payload : object | undefined;
   public cause : Error | undefined;
 
   constructor(msg: string, cause?: Error, sqs_payload? : object) {
     super(msg);
     this.name = 'HandlerError';
-    this.sqs_payload = sqs_payload;
+    this.payload = sqs_payload;
     this.cause = cause;
   }
 }
