@@ -56,7 +56,7 @@ describe('test/unit/sqs-poller-test.js', () => {
       it('should simulate handler call', async () => {
         const mock_message = { foo: 'bar', timestamp: new Date() };
         await sqs_poller.simulate(mock_message);
-        handler.should.be.calledOnce();
+        expect(handler.callCount).to.equal(1);
         handler.firstCall.args[0].should.eql({
           foo: 'bar',
           timestamp: mock_message.timestamp.toISOString(),
