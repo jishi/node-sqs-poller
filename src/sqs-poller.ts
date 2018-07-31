@@ -8,6 +8,7 @@ export type MessageHandler = (message: any) => Promise<void>;
 const BACKOFF_MULTIPLIERS = [1, 1, 1, 2, 2, 2, 2];
 const MAX_BACKOFF_SECONDS = 1200;
 const HTTP_TIMEOUT = 25000;
+const DEFAULT_HANDLER_TIMEOUT = 600000;
 
 
 function delay(ms: number): Promise<void> {
@@ -18,10 +19,10 @@ function delay(ms: number): Promise<void> {
 
 
 export class HandlerError extends Error {
-  public payload : object | undefined;
-  public cause : Error | undefined;
+  public payload: object | undefined;
+  public cause: Error | undefined;
 
-  constructor(msg: string, cause?: Error, sqs_payload? : object) {
+  constructor(msg: string, cause?: Error, sqs_payload?: object) {
     super(msg);
     this.name = 'HandlerError';
     this.payload = sqs_payload;
@@ -39,6 +40,7 @@ export class PollerError extends Error {
 
 
 export class SqsPoller extends EventEmitter {
+  public handler_timeout = DEFAULT_HANDLER_TIMEOUT; // Mostly exposed for testing
   private running: boolean;
   private queue_url: string;
   private sqs: SQS;
@@ -189,12 +191,17 @@ export class SqsPoller extends EventEmitter {
       return;
     }
 
+    let retry_timer;
     try {
       this.current_request = this.sqs.receiveMessage(this.receive_params);
       const data: SQS.Types.ReceiveMessageResult = await this.current_request.promise();
       const messages = data.Messages || [];
       const promises = messages.map((message: SQS.Types.Message) => this._processMessage(message));
+      retry_timer = setTimeout(() => {
+        throw new PollerError('Poller batch didn\'t finish within the retry_interval period, this means you have handler code that never resolve/reject and needs to be fixed');
+      }, this.handler_timeout);
       const promises_result = await Promise.all(promises);
+      clearTimeout(retry_timer);
       setImmediate(() => {
         this.emit('batch-complete', {
           received: messages.length,
@@ -203,6 +210,7 @@ export class SqsPoller extends EventEmitter {
       });
     }
     catch (err) {
+      clearTimeout(retry_timer);
       await this._handlePollError(err);
     }
 

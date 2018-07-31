@@ -60,8 +60,9 @@ describe('test/unit/sqs-poller-test.js', () => {
         handler.firstCall.args[0].should.eql({
           foo: 'bar',
           timestamp: mock_message.timestamp.toISOString(),
-        })
+        });
       });
+
     });
 
   });

@@ -1,8 +1,8 @@
 import autoRestoredSandbox from '@springworks/test-harness/autorestored-sandbox';
 import * as AWS from 'aws-sdk';
 import { expect } from 'chai';
-import { SinonSpy } from 'sinon';
 import * as sinon from 'sinon';
+import { SinonSpy } from 'sinon';
 import { HandlerError, PollerError, SqsPoller } from '../../src/sqs-poller';
 import { upsertQueueIfNotExists } from './queue-util';
 
@@ -14,6 +14,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
   const sqs = new AWS.SQS({ region: 'eu-west-1' });
   const sinon_sandbox = autoRestoredSandbox();
   const queue_name = 'sqs-poller-test-queue';
+  let message;
   let queue_url;
 
   before('upsert a queue if it doesn\'t exist', () => {
@@ -27,7 +28,6 @@ describe('test/acceptance/sqs-poller-test.js', () => {
   describe('when starting subscription with valid handler', () => {
     let poller;
     let handler;
-    let message;
     let messages;
 
     beforeEach(() => {
@@ -121,7 +121,6 @@ describe('test/acceptance/sqs-poller-test.js', () => {
       });
 
       describe('when we haven\'t registered an error handler', () => {
-        let error;
         let current_listeners;
 
         beforeEach(() => {
@@ -188,7 +187,6 @@ describe('test/acceptance/sqs-poller-test.js', () => {
   describe('when starting subscription with invalid handler', () => {
     let poller;
     let handler;
-    let message;
     let error_handler;
     let messages;
 
@@ -348,6 +346,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
 
       beforeEach(() => {
         poller = new SqsPoller(queue_url, handler, override_arguments);
+        poller.handler_timeout = 100;
       });
 
       beforeEach(() => {
@@ -379,6 +378,9 @@ describe('test/acceptance/sqs-poller-test.js', () => {
 
       beforeEach(() => {
         poller = new SqsPoller(queue_url, handler, override_arguments);
+        poller.on('error', () => {
+          // silently ignore handler errors.
+        });
       });
 
       beforeEach(() => {
@@ -389,6 +391,18 @@ describe('test/acceptance/sqs-poller-test.js', () => {
         poller.start();
       });
 
+      beforeEach(() => {
+        message = {
+          x: 'foo',
+          y: 'bar',
+        };
+        return sqs.sendMessage({
+              QueueUrl: queue_url,
+              MessageBody: JSON.stringify(message),
+            })
+            .promise();
+      });
+
       afterEach(() => {
         return poller.stop();
       });
@@ -396,9 +410,69 @@ describe('test/acceptance/sqs-poller-test.js', () => {
       it('should continuously call receiveMessage()', function (done) {
         this.timeout(5000);
         setTimeout(() => {
+          handler.callCount.should.be.greaterThan(0);
           poller.sqs.receiveMessage.callCount.should.be.greaterThan(2);
           done();
         }, 3000);
+      });
+
+    });
+
+    describe('when handler acts as a zombie', () => {
+      let current_listeners;
+
+      beforeEach(() => {
+        handler = sinon_sandbox.stub().returns(new Promise(() => {
+        }));
+      });
+
+      beforeEach(() => {
+        poller = new SqsPoller(queue_url, handler, override_arguments);
+        poller.handler_timeout = 1000;
+      });
+
+      beforeEach(() => {
+        sinon_sandbox.spy(poller.sqs, 'receiveMessage');
+      });
+
+      beforeEach(() => {
+        poller.start();
+      });
+
+      beforeEach(() => {
+        message = {
+          x: 'foo',
+          y: 'bar',
+        };
+        return sqs.sendMessage({
+              QueueUrl: queue_url,
+              MessageBody: JSON.stringify(message),
+            })
+            .promise();
+      });
+
+      beforeEach(() => {
+        current_listeners = process.listeners('uncaughtException');
+        process.removeAllListeners('uncaughtException');
+      });
+
+      afterEach(() => {
+        return poller.stop();
+      });
+
+      afterEach(() => {
+        current_listeners.forEach(listener => {
+          process.on('uncaughtException', listener);
+        });
+      });
+
+      it('should throw uncaught exception', function (done) {
+        this.timeout(10000);
+        process.once('uncaughtException', err => {
+          err.should.be.instanceOf(PollerError);
+          err.message.should.match(/needs to be fixed/);
+          done();
+        });
       });
 
     });
@@ -426,7 +500,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
     });
 
     describe('when started', () => {
-      let abort_spy : SinonSpy;
+      let abort_spy: SinonSpy;
 
       beforeEach(() => {
         return poller.start();
