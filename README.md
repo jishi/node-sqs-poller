@@ -38,6 +38,13 @@ Returns immediately. Starts polling the queue for messages.
 Returns promise. Resolves when poller has been stopped successfully 
 (i.e, stopped processing messages). This immediately aborts any current long-polling to exit as soon as possible.
 
+## handler_timeout
+
+Property which defaults to 600000 ms, that controls when the poller identifies a stale handler. A stale handler should not exist, it should 
+abort within a reasonable time frame to avoid memory leakage. A stale handler also blocks the polling loop, which means that the queue consumption will stop.
+The default should be reasonable, and this is mostly exposed for speeding up tests. However, if you have long running tasks for queue messages (+10 minutes)
+you can raise the timeout to something higher, if necessary.
+
 ## Events
 It will emit the following events:
 
