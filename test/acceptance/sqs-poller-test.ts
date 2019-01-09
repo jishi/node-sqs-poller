@@ -3,6 +3,7 @@ import * as AWS from 'aws-sdk';
 import { expect } from 'chai';
 import * as sinon from 'sinon';
 import { SinonSpy } from 'sinon';
+import * as backoff from '../../src/backoff';
 import { HandlerError, PollerError, SqsPoller } from '../../src/sqs-poller';
 import { upsertQueueIfNotExists } from './queue-util';
 
@@ -529,6 +530,92 @@ describe('test/acceptance/sqs-poller-test.js', () => {
 
   });
 
+  describe('configuring max backoff time', function () {
+    let poller;
+    let handler;
+    let backoff_spy;
+    let override_arguments;
+    let messages;
+
+    beforeEach(() => {
+      override_arguments = {
+        MaxNumberOfMessages: 1,
+        WaitTimeSeconds: 1,
+        VisibilityTimeout: 1,
+      };
+    });
+
+    beforeEach(() => {
+      handler = sinon_sandbox.stub().rejects(new Error('Mock error'));
+    });
+
+    beforeEach(() => {
+      poller = new SqsPoller(queue_url, handler, override_arguments);
+      poller.on('error', () => {});
+    });
+
+    beforeEach('collect all messages for deletion', () => {
+      messages = [];
+      poller.on('message', raw_message => {
+        messages.push(raw_message);
+      });
+    });
+
+    beforeEach(() => {
+      backoff_spy = sinon_sandbox.spy(backoff, 'backoff');
+    });
+
+    afterEach(() => {
+      return poller.stop();
+    });
+
+    afterEach(() => {
+      return deleteMessages(messages, sqs, queue_url);
+    });
+
+    describe('when max backoff time has not been set', () => {
+
+      beforeEach(() => {
+        return sendMessage(sqs, queue_url);
+      });
+
+      beforeEach(() => {
+        poller.start();
+      });
+
+      it('should use default max backoff value', function (done) {
+        this.timeout(4000);
+        setTimeout(() => {
+          backoff_spy.callCount.should.be.greaterThan(0);
+          backoff_spy.args[0][3].should.eql(1200);
+          done();
+        }, 2000);
+      });
+    });
+
+    describe('when max backoff time has been set', () => {
+
+      beforeEach(() => {
+        return sendMessage(sqs, queue_url);
+      });
+
+      beforeEach(() => {
+        poller.maxBackoffSeconds = 1400;
+        poller.start();
+      });
+
+      it('should use configured max backoff value', function (done) {
+        this.timeout(4000);
+        setTimeout(() => {
+          backoff_spy.callCount.should.be.greaterThan(0);
+          backoff_spy.args[0][3].should.eql(1400);
+          done();
+        }, 2000);
+      });
+    });
+  });
+
+
 });
 
 function deleteMessages(messages: any[], sqs, queue_url): Promise<any> {
@@ -540,4 +627,16 @@ function deleteMessages(messages: any[], sqs, queue_url): Promise<any> {
   });
 
   return Promise.all(delete_promises);
+}
+
+
+function sendMessage(sqs: AWS.SQS, queue_url: string): Promise<any> {
+  const message = {
+    x: 'foo',
+    y: 'bars',
+  };
+  return sqs.sendMessage({
+    QueueUrl: queue_url,
+    MessageBody: JSON.stringify(message),
+  }).promise();
 }

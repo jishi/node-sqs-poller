@@ -65,6 +65,34 @@ describe('test/unit/sqs-poller-test.js', () => {
 
     });
 
+    describe('setting maxBackoffSeconds', () => {
+
+      it('should not accept negative values', () => {
+        try {
+          sqs_poller.maxBackoffSeconds = -1;
+        }
+        catch (err) {
+          expect(err).to.be.instanceOf(PollerError);
+          return;
+        }
+
+        expect.fail('Should have thrown error');
+      });
+
+      it('should not accept values greater than 24 hours', () => {
+        try {
+          sqs_poller.maxBackoffSeconds = 24 * 60 * 60 + 1;
+        }
+        catch (err) {
+          expect(err).to.be.instanceOf(PollerError);
+          return;
+        }
+
+        expect.fail('Should have thrown error');
+      });
+
+    });
+
   });
 
 });
