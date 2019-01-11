@@ -68,14 +68,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
     });
 
     afterEach(() => {
-      const delete_promises = messages.map(raw_message => {
-        return sqs.deleteMessage({
-          QueueUrl: queue_url,
-          ReceiptHandle: raw_message.ReceiptHandle,
-        }).promise();
-      });
-
-      return Promise.all(delete_promises);
+      return deleteMessages(messages, sqs, queue_url);
     });
 
     describe('when handler resolves', () => {
@@ -243,14 +236,7 @@ describe('test/acceptance/sqs-poller-test.js', () => {
     });
 
     afterEach(() => {
-      const delete_promises = messages.map(raw_message => {
-        return sqs.deleteMessage({
-          QueueUrl: queue_url,
-          ReceiptHandle: raw_message.ReceiptHandle,
-        }).promise();
-      });
-
-      return Promise.all(delete_promises);
+      return deleteMessages(messages, sqs, queue_url);
     });
 
     it('should call error handler with PromiseError', () => {
@@ -331,12 +317,22 @@ describe('test/acceptance/sqs-poller-test.js', () => {
     let poller;
     let handler;
     let override_arguments;
+    let messages;
 
     beforeEach(() => {
       override_arguments = {
         MaxNumberOfMessages: 1,
         WaitTimeSeconds: 1,
+        VisibilityTimeout: 1,
       };
+    });
+
+    beforeEach('collect all messages for deletion', () => {
+      messages = [];
+    });
+
+    afterEach(() => {
+      return deleteMessages(messages, sqs, queue_url);
     });
 
     describe('when handler resolves', () => {
@@ -360,7 +356,6 @@ describe('test/acceptance/sqs-poller-test.js', () => {
       afterEach(() => {
         return poller.stop();
       });
-
       it('should continuously call receiveMessage()', function (done) {
         this.timeout(3000);
         setTimeout(() => {
@@ -380,6 +375,12 @@ describe('test/acceptance/sqs-poller-test.js', () => {
         poller = new SqsPoller(queue_url, handler, override_arguments);
         poller.on('error', () => {
           // silently ignore handler errors.
+        });
+      });
+
+      beforeEach('collect all messages for deletion', () => {
+        poller.on('message', raw_message => {
+          messages.push(raw_message);
         });
       });
 
@@ -429,6 +430,13 @@ describe('test/acceptance/sqs-poller-test.js', () => {
       beforeEach(() => {
         poller = new SqsPoller(queue_url, handler, override_arguments);
         poller.handler_timeout = 1000;
+      });
+
+      beforeEach('collect all messages for deletion', () => {
+        messages = [];
+        poller.on('message', raw_message => {
+          messages.push(raw_message);
+        });
       });
 
       beforeEach(() => {
@@ -523,3 +531,13 @@ describe('test/acceptance/sqs-poller-test.js', () => {
 
 });
 
+function deleteMessages(messages: any[], sqs, queue_url): Promise<any> {
+  const delete_promises = messages.map(raw_message => {
+    return sqs.deleteMessage({
+      QueueUrl: queue_url,
+      ReceiptHandle: raw_message.ReceiptHandle,
+    }).promise();
+  });
+
+  return Promise.all(delete_promises);
+}
