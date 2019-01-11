@@ -6,7 +6,8 @@ import { backoff } from './backoff';
 export type MessageHandler = (message: any) => Promise<void>;
 
 const BACKOFF_MULTIPLIERS = [1, 1, 1, 2, 2, 2, 2];
-const MAX_BACKOFF_SECONDS = 1200;
+const DEFAULT_MAX_BACKOFF_SECONDS = 1200;
+const MAX_BACKOFF_SECONDS = 43200;
 const HTTP_TIMEOUT = 25000;
 const DEFAULT_HANDLER_TIMEOUT = 600000;
 
@@ -41,6 +42,7 @@ export class PollerError extends Error {
 
 export class SqsPoller extends EventEmitter {
   public handler_timeout = DEFAULT_HANDLER_TIMEOUT; // Mostly exposed for testing
+  private _maxBackoffSeconds: number = DEFAULT_MAX_BACKOFF_SECONDS;
   private running: boolean;
   private queue_url: string;
   private sqs: SQS;
@@ -62,6 +64,14 @@ export class SqsPoller extends EventEmitter {
     });
     this.running = false;
     this.current_request = null;
+  }
+
+  set maxBackoffSeconds(seconds: number) {
+    if (seconds > 0 && seconds <= MAX_BACKOFF_SECONDS) {
+      this._maxBackoffSeconds = seconds;
+    } else {
+      throw new PollerError(`max backoff must be between 0 and ${MAX_BACKOFF_SECONDS}`);
+    }
   }
 
   public async start() {
@@ -122,7 +132,7 @@ export class SqsPoller extends EventEmitter {
   }
 
   private async _setVisibility(receipt_id: string, receive_count: number) {
-    const visibility_timeout = backoff(this.visibility_timeout, receive_count, BACKOFF_MULTIPLIERS, MAX_BACKOFF_SECONDS);
+    const visibility_timeout = backoff(this.visibility_timeout, receive_count, BACKOFF_MULTIPLIERS, this._maxBackoffSeconds);
 
     if (visibility_timeout === this.visibility_timeout) {
       return;
