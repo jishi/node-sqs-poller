@@ -5,7 +5,7 @@ import { backoff } from './backoff';
 
 export type MessageHandler = (message: any) => Promise<void>;
 
-const BACKOFF_MULTIPLIERS = [1, 1, 1, 2, 2, 2, 2];
+const BACKOFF_MULTIPLIERS = [1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
 const DEFAULT_MAX_BACKOFF_SECONDS = 1200;
 const MAX_BACKOFF_SECONDS = 43200;
 const HTTP_TIMEOUT = 25000;
