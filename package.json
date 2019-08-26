@@ -4,9 +4,6 @@
   "description": "SQS poller logic",
   "main": "sqs-poller.js",
   "types": "sqs-poller.d.ts",
-  "directories": {
-    "test": "test"
-  },
   "scripts": {
     "test": "NODE_ENV=test mocha",
     "build": "rm -rf build/* && tsc && cp package.json build/ && cp README.md build/",
