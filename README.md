@@ -30,6 +30,12 @@ Returns immediately. Starts polling the queue for messages.
 Returns promise. Resolves when poller has been stopped successfully 
 (i.e, stopped processing messages). This immediately aborts any current long-polling to exit as soon as possible.
 
+## simulate(any obj) -> Promise
+
+For testing purposes. To simulate testing you can invoke this function with the expected payload, and it will be serialized/deserialized (to simulate a roundtrip via an SQS queue) passed on to the handler function and resolve once the handler resolves.
+
+It throws an error if the poller is not started, to let you know if your wire-up is not correct. This means you still need a valid queue url to simulate.
+
 ## setMaxBackoffSeconds(int seconds) -> void
 
 Sets the maximum backoff a message will reach during failed attempts. (default: 1200 seconds, 20 minutes);
