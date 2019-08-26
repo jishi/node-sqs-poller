@@ -1,6 +1,11 @@
 {
-  "extends": "@springworks/tslint-config",
+  "extends": "tslint:recommended",
   "rules": {
-    "member-access": true
+    "member-access": true,
+    "variable-name": [
+      true,
+      "allow-leading-underscore"
+    ],
+    "quotemark": [true, "single", "avoid-escape"]
   }
 }

@@ -1,10 +1,5 @@
 node_modules
 build
-coverage
-npm-debug.log
 .idea
-.eslintcache
 .DS_Store
 *.log
-.nyc_output
-package-lock.json

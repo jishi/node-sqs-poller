@@ -1,39 +1,43 @@
 import { expect } from 'chai';
 import { EventEmitter } from 'events';
 import * as sinon from 'sinon';
-import { PollerError, SqsPoller } from '../../src/sqs-poller';
+import { PollerError } from '../../src/poller-error';
+import { SqsPoller } from '../../src/sqs-poller';
 
 describe('test/unit/sqs-poller-test.js', () => {
 
   describe('with an instance of SqsPoller', () => {
-    let sqs_poller: SqsPoller;
+    let sqsPoller: SqsPoller;
     let handler: sinon.SinonStub;
 
     beforeEach(() => {
       handler = sinon.stub().resolves();
-      sqs_poller = new SqsPoller('https://some.fake.url', handler);
-      sqs_poller.on('error', () => {
+      sqsPoller = new SqsPoller('https://some.fake.url', handler);
+      sqsPoller.on('error', () => {
         // Muting errors since it's not relevant in this test.
-      })
+      });
+    });
+
+    afterEach(() => {
+      sinon.restore();
     });
 
     it('should be an event-emitter', () => {
-      sqs_poller.should.be.instanceOf(EventEmitter);
+      expect(sqsPoller).to.be.instanceOf(EventEmitter);
     });
 
     it('should have a start/stop function', () => {
-      sqs_poller.start.should.be.instanceOf(Function);
-      sqs_poller.stop.should.be.instanceOf(Function);
+      expect(sqsPoller.start).to.be.instanceOf(Function);
+      expect(sqsPoller.stop).to.be.instanceOf(Function);
     });
 
     describe('when poller isn\'t started', () => {
 
       it('should throw error if not started', async () => {
-        const mock_message = { foo: 'bar', timestamp: new Date() };
+        const mockMessage = { foo: 'bar', timestamp: new Date() };
         try {
-          await sqs_poller.simulate(mock_message);
-        }
-        catch (err) {
+          await sqsPoller.simulate(mockMessage);
+        } catch (err) {
           expect(err).to.be.instanceOf(PollerError);
           return;
         }
@@ -46,20 +50,20 @@ describe('test/unit/sqs-poller-test.js', () => {
     describe('when poller is started', () => {
 
       beforeEach(() => {
-        sqs_poller.start();
+        sqsPoller.start();
       });
 
       afterEach(() => {
-        sqs_poller.stop();
+        sqsPoller.stop();
       });
 
       it('should simulate handler call', async () => {
-        const mock_message = { foo: 'bar', timestamp: new Date() };
-        await sqs_poller.simulate(mock_message);
+        const mockMessage = { foo: 'bar', timestamp: new Date() };
+        await sqsPoller.simulate(mockMessage);
         expect(handler.callCount).to.equal(1);
-        handler.firstCall.args[0].should.eql({
+        expect(handler.firstCall.args[0]).to.eql({
           foo: 'bar',
-          timestamp: mock_message.timestamp.toISOString(),
+          timestamp: mockMessage.timestamp.toISOString(),
         });
       });
 
@@ -69,9 +73,8 @@ describe('test/unit/sqs-poller-test.js', () => {
 
       it('should not accept negative values', () => {
         try {
-          sqs_poller.maxBackoffSeconds = -1;
-        }
-        catch (err) {
+          sqsPoller.maxBackoffSeconds = -1;
+        } catch (err) {
           expect(err).to.be.instanceOf(PollerError);
           return;
         }
@@ -81,9 +84,8 @@ describe('test/unit/sqs-poller-test.js', () => {
 
       it('should not accept values greater than 24 hours', () => {
         try {
-          sqs_poller.maxBackoffSeconds = 24 * 60 * 60 + 1;
-        }
-        catch (err) {
+          sqsPoller.maxBackoffSeconds = 24 * 60 * 60 + 1;
+        } catch (err) {
           expect(err).to.be.instanceOf(PollerError);
           return;
         }

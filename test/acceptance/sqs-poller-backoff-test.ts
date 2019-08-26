@@ -1,28 +1,26 @@
 import * as AWS from 'aws-sdk';
+import { expect } from 'chai';
 import * as sinon from 'sinon';
-import autoRestoredSandbox from '@springworks/test-harness/autorestored-sandbox';
-import { SqsPoller } from '../../src/sqs-poller';
 import * as backoff from '../../src/backoff';
+import { SqsPoller } from '../../src/sqs-poller';
 import { upsertQueueIfNotExists } from './queue-util';
 
-process.on('unhandledRejection', err => {
+process.on('unhandledRejection', (err) => {
   throw err;
 });
 
 describe('test/acceptance/sqs-poller-backoff-test.js', () => {
   const sqs = new AWS.SQS({ region: 'eu-west-1' });
-  const sinon_sandbox = autoRestoredSandbox();
-  const queue_name = 'sqs-poller-backoff-test-queue';
-  let queue_url;
+  const queueName = 'sqs-poller-backoff-test-queue';
+  let queueUrl;
 
   before('upsert a queue if it doesn\'t exist', () => {
-    return upsertQueueIfNotExists(queue_name, 0)
-        .then(url => {
-          queue_url = url;
+    return upsertQueueIfNotExists(queueName, 0)
+        .then((url) => {
+          queueUrl = url;
           return null;
         });
   });
-
 
   let poller;
   let handler;
@@ -30,11 +28,11 @@ describe('test/acceptance/sqs-poller-backoff-test.js', () => {
   let messages;
 
   beforeEach(() => {
-    handler = sinon_sandbox.stub().resolves();
+    handler = sinon.stub().resolves();
   });
 
   beforeEach(() => {
-    sinon_sandbox.stub(backoff, 'backoff')
+    sinon.stub(backoff, 'backoff')
         .returns(64)
         .onCall(0).returns(0)
         .onCall(1).returns(0)
@@ -52,26 +50,26 @@ describe('test/acceptance/sqs-poller-backoff-test.js', () => {
       y: 'bar',
     };
     return sqs.sendMessage({
-          QueueUrl: queue_url,
           MessageBody: JSON.stringify(message),
+          QueueUrl: queueUrl,
         })
         .promise();
   });
 
   beforeEach(() => {
-    poller = new SqsPoller(queue_url, handler);
+    poller = new SqsPoller(queueUrl, handler);
   });
 
   beforeEach(() => {
-    sinon_sandbox.spy(poller.sqs, 'deleteMessage');
-    sinon_sandbox.spy(poller.sqs, 'receiveMessage');
-    sinon_sandbox.spy(poller.sqs, 'changeMessageVisibility');
+    sinon.spy(poller.sqs, 'deleteMessage');
+    sinon.spy(poller.sqs, 'receiveMessage');
+    sinon.spy(poller.sqs, 'changeMessageVisibility');
   });
 
   beforeEach('collect all messages for deletion', () => {
     messages = [];
-    poller.on('message', raw_message => {
-      messages.push(raw_message);
+    poller.on('message', (rawMessage) => {
+      messages.push(rawMessage);
     });
   });
 
@@ -84,20 +82,23 @@ describe('test/acceptance/sqs-poller-backoff-test.js', () => {
   });
 
   afterEach(() => {
-    const delete_promises = messages.map(raw_message => {
+    const deletePromises = messages.map((rawMessage) => {
       return sqs.deleteMessage({
-        QueueUrl: queue_url,
-        ReceiptHandle: raw_message.ReceiptHandle,
+        QueueUrl: queueUrl,
+        ReceiptHandle: rawMessage.ReceiptHandle,
       }).promise();
     });
 
-    return Promise.all(delete_promises);
+    return Promise.all(deletePromises);
   });
 
+  afterEach(() => {
+    sinon.restore();
+  });
 
   describe('when handler rejects several messages', () => {
 
-    let message_count = 0;
+    let messageCount = 0;
 
     beforeEach(() => {
       poller.on('error', sinon.spy());
@@ -107,10 +108,9 @@ describe('test/acceptance/sqs-poller-backoff-test.js', () => {
       handler.rejects(new Error('mocked reject error'));
     });
 
-
-    beforeEach(done => {
+    beforeEach((done) => {
       poller.on('message', () => {
-        if (message_count++ === 5) {
+        if (messageCount++ === 5) {
           return done();
         }
         return true;
@@ -119,20 +119,20 @@ describe('test/acceptance/sqs-poller-backoff-test.js', () => {
 
     describe('when default backoff is used', () => {
       it('should not set visibility timeout on a single failed message', () => {
-        const call_count = poller.sqs.changeMessageVisibility.callCount;
-        call_count.should.be.greaterThan(1);
-        (message_count - call_count).should.equal(3); // First three failures should not increase visibility timeout
-        for (let idx = 0; idx < call_count; idx++) {
+        const callCount = poller.sqs.changeMessageVisibility.callCount;
+        expect(callCount).to.be.greaterThan(1);
+        expect(messageCount - callCount).to.equal(3); // First three failures should not increase visibility timeout
+        for (let idx = 0; idx < callCount; idx++) {
           verifyCall(poller.sqs.changeMessageVisibility.getCall(idx), idx);
         }
       });
 
       function verifyCall(call, idx) {
-        const expected_backoffs = [2, 4, 8, 16, 32, 64];
-        const expected_backoff = idx >= expected_backoffs.length ? 64 : expected_backoffs[idx];
-        call.args[0].should.match({
-          QueueUrl: queue_url,
-          VisibilityTimeout: expected_backoff,
+        const expectedBackoffs = [2, 4, 8, 16, 32, 64];
+        const expectedBackoff = idx >= expectedBackoffs.length ? 64 : expectedBackoffs[idx];
+        expect(call.args[0]).to.include({
+          QueueUrl: queueUrl,
+          VisibilityTimeout: expectedBackoff,
         });
       }
 
@@ -141,5 +141,3 @@ describe('test/acceptance/sqs-poller-backoff-test.js', () => {
   });
 
 });
-
-

@@ -4,5 +4,4 @@
 --slow 200
 --reporter spec
 --require ts-node/register
---require @springworks/test-harness
 test/**/*.ts

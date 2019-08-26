@@ -2,6 +2,8 @@ import { AWSError, Request, SQS } from 'aws-sdk';
 import { EventEmitter } from 'events';
 import { defaultsDeep } from 'lodash';
 import { backoff } from './backoff';
+import { HandlerError } from './handler-error';
+import { PollerError } from './poller-error';
 
 export type MessageHandler = (message: any) => Promise<void>;
 
@@ -11,64 +13,44 @@ const MAX_BACKOFF_SECONDS = 43200;
 const HTTP_TIMEOUT = 25000;
 const DEFAULT_HANDLER_TIMEOUT = 600000;
 
-
 function delay(ms: number): Promise<void> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
-
-export class HandlerError extends Error {
-  public payload: object | undefined;
-  public cause: Error | undefined;
-
-  constructor(msg: string, cause?: Error, sqs_payload?: object) {
-    super(msg);
-    this.name = 'HandlerError';
-    this.payload = sqs_payload;
-    this.cause = cause;
-  }
-}
-
-
-export class PollerError extends Error {
-  constructor(msg: string) {
-    super(msg);
-    this.name = 'PollerError';
-  }
-}
-
-
 export class SqsPoller extends EventEmitter {
-  public handler_timeout = DEFAULT_HANDLER_TIMEOUT; // Mostly exposed for testing
-  private _maxBackoffSeconds: number = DEFAULT_MAX_BACKOFF_SECONDS;
+  public handlerTimeout = DEFAULT_HANDLER_TIMEOUT; // Mostly exposed for testing
   private running: boolean;
-  private queue_url: string;
+  private queueUrl: string;
   private sqs: SQS;
   private handler: MessageHandler;
-  private receive_params: SQS.Types.ReceiveMessageRequest;
-  private current_request: null | Request<SQS.Types.ReceiveMessageResult, AWSError>;
-  private visibility_timeout = 0;
+  private receiveParams: SQS.Types.ReceiveMessageRequest;
+  private currentRequest: null | Request<SQS.Types.ReceiveMessageResult, AWSError>;
+  private visibilityTimeout = 0;
+  private maxBackoffSeconds: number = DEFAULT_MAX_BACKOFF_SECONDS;
 
-  constructor(queue_url: string, handler: MessageHandler, receive_arguments_override: Partial<SQS.Types.ReceiveMessageRequest> = {}, region: string = 'eu-west-1') {
+  constructor(
+      queueUrl: string,
+      handler: MessageHandler,
+      receiveArgumentsOverride: Partial<SQS.Types.ReceiveMessageRequest> = {}) {
     super();
     this.handler = handler;
-    this.queue_url = queue_url;
-    this.sqs = new SQS({ region, apiVersion: '2012-11-05', httpOptions: { timeout: HTTP_TIMEOUT }, maxRetries: 3 });
-    this.receive_params = defaultsDeep(receive_arguments_override, {
+    this.queueUrl = queueUrl;
+    this.sqs = new SQS({ apiVersion: '2012-11-05', httpOptions: { timeout: HTTP_TIMEOUT }, maxRetries: 3 });
+    this.receiveParams = defaultsDeep(receiveArgumentsOverride, {
       AttributeNames: ['ApproximateReceiveCount'],
       MaxNumberOfMessages: 10,
-      QueueUrl: queue_url,
+      QueueUrl: queueUrl,
       WaitTimeSeconds: 20,
     });
     this.running = false;
-    this.current_request = null;
+    this.currentRequest = null;
   }
 
-  set maxBackoffSeconds(seconds: number) {
+  public setMaxBackoffSeconds(seconds: number) {
     if (seconds > 0 && seconds <= MAX_BACKOFF_SECONDS) {
-      this._maxBackoffSeconds = seconds;
+      this.maxBackoffSeconds = seconds;
     } else {
       throw new PollerError(`max backoff must be between 0 and ${MAX_BACKOFF_SECONDS}`);
     }
@@ -82,32 +64,35 @@ export class SqsPoller extends EventEmitter {
 
     this.running = true;
     try {
-      const data = await this.sqs.getQueueAttributes({ AttributeNames: ['VisibilityTimeout'], QueueUrl: this.queue_url }).promise();
+      const data = await this.sqs.getQueueAttributes({
+            AttributeNames: ['VisibilityTimeout'],
+            QueueUrl: this.queueUrl,
+          })
+          .promise();
 
-      const visibility_timeout = data.Attributes && data.Attributes.VisibilityTimeout;
-      if (typeof visibility_timeout !== 'string' && typeof visibility_timeout !== 'number') {
+      const visibilityTimeout = data.Attributes && data.Attributes.VisibilityTimeout;
+      if (typeof visibilityTimeout !== 'string' && typeof visibilityTimeout !== 'number') {
         throw new Error('VisibilityTimeout not defined');
       }
-      this.visibility_timeout = parseInt(visibility_timeout, 10);
+      this.visibilityTimeout = parseInt(visibilityTimeout, 10);
 
-      this._runPoll().catch(err => this._throw(err));
-    }
-    catch (err) {
+      this._runPoll().catch((err) => this._throw(err));
+    } catch (err) {
       this._throw(err);
     }
   }
 
   public async stop() {
     this.running = false;
-    if (this.current_request) {
-      this.current_request.abort();
+    if (this.currentRequest) {
+      this.currentRequest.abort();
     }
-    this.current_request = null;
+    this.currentRequest = null;
   }
 
   public async simulate(msg) {
     if (!this.running) {
-      throw new PollerError('Poller wasn\'t started, so no handler would have been invoked');
+      throw new PollerError("Poller wasn't started, so no handler would have been invoked");
     }
 
     await this.handler(JSON.parse(JSON.stringify(msg)));
@@ -122,42 +107,43 @@ export class SqsPoller extends EventEmitter {
     });
   }
 
-  private async _deleteMessage(receipt_id: string) {
+  private async _deleteMessage(receiptId: string) {
     try {
-      await this.sqs.deleteMessage({ QueueUrl: this.queue_url, ReceiptHandle: receipt_id }).promise();
-    }
-    catch (err) {
+      await this.sqs.deleteMessage({ QueueUrl: this.queueUrl, ReceiptHandle: receiptId }).promise();
+    } catch (err) {
       this._throw(err);
     }
   }
 
-  private async _setVisibility(receipt_id: string, receive_count: number) {
-    const visibility_timeout = backoff(this.visibility_timeout, receive_count, BACKOFF_MULTIPLIERS, this._maxBackoffSeconds);
+  private async _setVisibility(receiptId: string, receiveCount: number) {
+    const visibilityTimeout = backoff(this.visibilityTimeout,
+        receiveCount,
+        BACKOFF_MULTIPLIERS,
+        this.maxBackoffSeconds);
 
-    if (visibility_timeout === this.visibility_timeout) {
+    if (visibilityTimeout === this.visibilityTimeout) {
       return;
     }
 
-    const visibility_options = {
-      QueueUrl: this.queue_url,
-      ReceiptHandle: receipt_id,
-      VisibilityTimeout: visibility_timeout,
+    const visibilityOptions = {
+      QueueUrl: this.queueUrl,
+      ReceiptHandle: receiptId,
+      VisibilityTimeout: visibilityTimeout,
     };
 
     try {
-      await this.sqs.changeMessageVisibility(visibility_options).promise();
-    }
-    catch (err) {
+      await this.sqs.changeMessageVisibility(visibilityOptions).promise();
+    } catch (err) {
       this._throw(err);
     }
   }
 
   private async _processMessage(message: SQS.Types.Message) {
-    const receipt_id = message.ReceiptHandle;
-    const receive_count = message.Attributes ? message.Attributes.ApproximateReceiveCount : undefined;
+    const receiptId = message.ReceiptHandle;
+    const receiveCount = message.Attributes ? message.Attributes.ApproximateReceiveCount : undefined;
     const json = message.Body;
 
-    if (!json || !receipt_id || !receive_count) {
+    if (!json || !receiptId || !receiveCount) {
       return false;
     }
 
@@ -168,20 +154,19 @@ export class SqsPoller extends EventEmitter {
     const promise = this.handler(body);
 
     if (!promise || typeof promise.then !== 'function') {
-      this._throw(new HandlerError('Handler function doesn\'t return a promise'));
+      this._throw(new HandlerError("Handler function doesn't return a promise"));
       return false;
     }
 
     try {
       await promise;
-      await this._deleteMessage(receipt_id);
+      await this._deleteMessage(receiptId);
       return true;
-    }
-    catch (err) {
-      const wrapped_error = new HandlerError(err.message, err, body);
-      wrapped_error.stack = err.stack;
-      this._throw(wrapped_error);
-      await this._setVisibility(receipt_id, parseInt(receive_count));
+    } catch (err) {
+      const wrappedError = new HandlerError(err.message, err, body);
+      wrappedError.stack = err.stack;
+      this._throw(wrappedError);
+      await this._setVisibility(receiptId, parseInt(receiveCount, 10));
       return false;
     }
   }
@@ -201,29 +186,29 @@ export class SqsPoller extends EventEmitter {
       return;
     }
 
-    let retry_timer;
+    let retryTimer;
     try {
-      this.current_request = this.sqs.receiveMessage(this.receive_params);
-      const data: SQS.Types.ReceiveMessageResult = await this.current_request.promise();
+      this.currentRequest = this.sqs.receiveMessage(this.receiveParams);
+      const data: SQS.Types.ReceiveMessageResult = await this.currentRequest.promise();
       const messages = data.Messages || [];
       const promises = messages.map((message: SQS.Types.Message) => this._processMessage(message));
-      retry_timer = setTimeout(() => {
-        throw new PollerError('Poller batch didn\'t finish within the retry_interval period, this means you have handler code that never resolve/reject and needs to be fixed');
-      }, this.handler_timeout);
-      const promises_result = await Promise.all(promises);
-      clearTimeout(retry_timer);
+      retryTimer = setTimeout(() => {
+        throw new PollerError("Poller batch didn't finish within the retry period, " +
+            'this means you have handler code that never resolve/reject and needs to be fixed');
+      }, this.handlerTimeout);
+      const promisesResult = await Promise.all(promises);
+      clearTimeout(retryTimer);
       setImmediate(() => {
         this.emit('batch-complete', {
           received: messages.length,
-          successful: promises_result.filter(result => result).length,
+          successful: promisesResult.filter((result) => result).length,
         });
       });
-    }
-    catch (err) {
-      clearTimeout(retry_timer);
+    } catch (err) {
+      clearTimeout(retryTimer);
       await this._handlePollError(err);
     }
 
-    this._runPoll().catch(err => this._throw(err));
+    this._runPoll().catch((err) => this._throw(err));
   }
 }
