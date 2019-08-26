@@ -1,17 +1,17 @@
 {
-  "name": "@jishi/sqs-poller",
+  "name": "@jishimi/sqs-poller",
   "version": "1.0.0",
   "description": "SQS poller logic",
   "main": "sqs-poller.js",
   "types": "sqs-poller.d.ts",
   "scripts": {
-    "test": "NODE_ENV=test mocha",
+    "test": "mocha",
     "build": "rm -rf build/* && tsc && cp package.json build/ && cp README.md build/",
     "lint": "tslint src/**.ts test/**/*.ts"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Springworks/node-sqs-poller.git"
+    "url": "https://github.com/jishi/node-sqs-poller.git"
   },
   "author": "Jimmy Shimizu",
   "license": "ISC",
