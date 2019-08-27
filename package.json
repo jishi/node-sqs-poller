@@ -1,6 +1,6 @@
 {
   "name": "@jishimi/sqs-poller",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "SQS poller logic",
   "main": "sqs-poller.js",
   "types": "sqs-poller.d.ts",

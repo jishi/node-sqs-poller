@@ -91,10 +91,6 @@ export class SqsPoller extends EventEmitter {
   }
 
   public async simulate(msg) {
-    if (!this.running) {
-      throw new PollerError("Poller wasn't started, so no handler would have been invoked");
-    }
-
     await this.handler(JSON.parse(JSON.stringify(msg)));
   }
 

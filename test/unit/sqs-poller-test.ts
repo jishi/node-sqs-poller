@@ -33,16 +33,9 @@ describe('test/unit/sqs-poller-test.js', () => {
 
     describe('when poller isn\'t started', () => {
 
-      it('should throw error if not started', async () => {
+      it('should still simulate', async () => {
         const mockMessage = { foo: 'bar', timestamp: new Date() };
-        try {
-          await sqsPoller.simulate(mockMessage);
-        } catch (err) {
-          expect(err).to.be.instanceOf(PollerError);
-          return;
-        }
-
-        expect.fail('Should have thrown error');
+        await sqsPoller.simulate(mockMessage);
       });
 
     });

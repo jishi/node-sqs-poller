@@ -1,12 +1,60 @@
 # SqsPoller
 
+This is yet another SQS consumption library that came to life because none of the current ones fit my requirements.
+It has been battle-tested in production for several years and has been very reliable and also performant. 
+
+This library is designed around the idea that you shouldn't need to concern yourself of the long-polling nature of SQS, 
+but rather be able to consider messages to be emitted to your app. Coming from a RabbitMQ background, this design feels
+more comfortable to work with for me.
+
+It also needed to support async/promise flow natively, to simplify the implementation and also play nicely with other
+async code bases. 
+
+I wanted it to maintain a steady memory footprint, meaning that it should have a maximum amount of in-flight 
+messages at any given time. I was worried that this criteria would slow down the message consumption rate, but that 
+seems to have been unfounded. 
+
+
+
+## Permissions
+
+The required permissions to consume the queue are:
+
+    sqs:ReceiveMessage
+    sqs:DeleteMessage
+    sqs:ChangeMessageVisibility
+    sqs:GetQueueAttributes
+    
+## Credentials
+
+To simplify this even further, it will use the default credential lookup for the aws-sdk, but there is no possibility 
+to specify credentials manually per instance. This was deliberate to keep things simple. This might change if need would 
+arise.
+
+Thus, it will look for ENV variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION), or use the default or 
+specified profile (AWS_PROFILE). Even though profiles have default regions, the SDKs don't read that. Also, even though 
+region is part of the queue URL, you still need to specify it manually. See the
+[Node.js documentation](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/setting-credentials-node.html)
+for more info.
+ 
+
 ## constructor
 
-`new SqsPoller(queue_url, handler, receive_arguments_override = {}, region = 'eu-west-1')`
+`new SqsPoller(queue_url, handler, receive_arguments_override = {})`
 
 Handler must return a Promise, otherwise it will reject all messages 
 (but still process it). On fulfilled promise, it will delete message 
-from queue.
+from queue. Async functions are fine to use.
+
+Example
+```
+const poller = new SqsPoller('ttps://sqs.eu-central-1.amazonaws.com/123456789012/some-queue', async (msg) => {
+    await doSomeAsyncStuff();
+});
+
+poller.on('error', (err) => console.error(err));
+poller.start();
+```
 
 default receive arguments are:
 
@@ -32,9 +80,9 @@ Returns promise. Resolves when poller has been stopped successfully
 
 ## simulate(any obj) -> Promise
 
-For testing purposes. To simulate testing you can invoke this function with the expected payload, and it will be serialized/deserialized (to simulate a roundtrip via an SQS queue) passed on to the handler function and resolve once the handler resolves.
-
-It throws an error if the poller is not started, to let you know if your wire-up is not correct. This means you still need a valid queue url to simulate.
+For testing purposes. To simulate testing you can invoke this function with the expected payload, and it will be 
+serialized/deserialized (to simulate a roundtrip via an SQS queue) passed on to the handler function and resolve once 
+the handler resolves.
 
 ## setMaxBackoffSeconds(int seconds) -> void
 
