@@ -1,3 +1,5 @@
+[![Actions Status](https://github.com/jishi/node-sqs-poller/workflows/Node%20CI/badge.svg)](https://github.com/jishi/node-sqs-poller/actions)
+
 # SqsPoller
 
 This is yet another SQS consumption library that came to life because none of the current ones fit my requirements.
