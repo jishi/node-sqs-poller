@@ -1,7 +1,15 @@
 {
   "name": "@jishimi/sqs-poller",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "SQS poller logic",
+  "keywords": [
+    "aws",
+    "sqs",
+    "queue",
+    "async",
+    "await",
+    "backoff"
+  ],
   "main": "sqs-poller.js",
   "types": "sqs-poller.d.ts",
   "scripts": {
