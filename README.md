@@ -1,4 +1,5 @@
 [![Actions Status](https://github.com/jishi/node-sqs-poller/workflows/Node%20CI/badge.svg)](https://github.com/jishi/node-sqs-poller/actions)
+![npm (scoped)](https://img.shields.io/npm/v/@jishimi/sqs-poller)
 
 # SqsPoller
 
