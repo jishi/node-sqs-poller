@@ -1,6 +1,6 @@
 {
   "name": "@jishimi/sqs-poller",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "SQS poller logic",
   "keywords": [
     "aws",
